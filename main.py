@@ -101,8 +101,8 @@ async def report(
     embed.add_field(name="ไอดี", value=f"**{id}**", inline=False)
     embed.add_field(name="สาเหตุ", value=f"**{reason}**", inline=False)
 
-    # ฝังรูปภาพโปรไฟล์ใน Embed
-    embed.set_thumbnail(url=profile.url)
+    # ฝังรูปภาพโปรไฟล์ขนาดใหญ่ด้านล่าง Embed
+    embed.set_image(url=profile.url)
 
     # รวบรวมรูปภาพที่แนบมา
     attachments = []
