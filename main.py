@@ -9,9 +9,9 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents, activity=None)
 
 # ตั้งค่า Channel ID และ Role ID ที่ใช้ในระบบ
-REPORT_CHANNEL_ID = 566677382772  # ห้องที่ส่งรายงาน
-LOG_CHANNEL_ID = 66675277262627   # ห้อง Log
-MOD_ROLE_ID = 575277878           # บทบาทที่สามารถยืนยันรายงานได้
+REPORT_CHANNEL_ID = 1333073139562709002  # ห้องที่ส่งรายงาน
+LOG_CHANNEL_ID = 1333392202939760690   # ห้อง Log
+MOD_ROLE_ID = 1330887708100399135           # บทบาทที่สามารถยืนยันรายงานได้
 
 @bot.event
 async def on_ready():
