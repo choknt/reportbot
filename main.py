@@ -22,7 +22,7 @@ def setup_google_sheets():
     }
     creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials, scope)
     client = gspread.authorize(creds)
-    sheet = client.open("รายงานผู้เล่น").sheet1  # ชื่อ Google Sheet
+    sheet = client.open_by_key("1JJd2_NfRCxmy30R2Kw1QzHYpWfioE9U8ImY6W9PqhF0")  # ชื่อ Google Sheet
     return sheet
 
 # ใช้ Intents.all() เพื่อให้บอทมีสิทธิ์เข้าถึงทุกอย่าง
