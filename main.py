@@ -2,14 +2,28 @@ import os
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
-from flask import Flask
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# ตั้งค่า Flask
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "บอทรายงาน Discord กำลังทำงานอยู่!"
+# ตั้งค่า Google Sheets API
+def setup_google_sheets():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    credentials = {
+        "type": os.getenv("GOOGLE_TYPE"),
+        "project_id": os.getenv("GOOGLE_PROJECT_ID"),
+        "private_key_id": os.getenv("GOOGLE_PRIVATE_KEY_ID"),
+        "private_key": os.getenv("GOOGLE_PRIVATE_KEY").replace("\\n", "\n"),
+        "client_email": os.getenv("GOOGLE_CLIENT_EMAIL"),
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "auth_uri": os.getenv("GOOGLE_AUTH_URI"),
+        "token_uri": os.getenv("GOOGLE_TOKEN_URI"),
+        "auth_provider_x509_cert_url": os.getenv("GOOGLE_AUTH_PROVIDER_CERT_URL"),
+        "client_x509_cert_url": os.getenv("GOOGLE_CLIENT_CERT_URL")
+    }
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open("รายงานผู้เล่น").sheet1  # ชื่อ Google Sheet
+    return sheet
 
 # ใช้ Intents.all() เพื่อให้บอทมีสิทธิ์เข้าถึงทุกอย่าง
 intents = discord.Intents.all()
@@ -38,8 +52,9 @@ async def on_ready():
         print(e)
 
 class ConfirmView(ui.View):
-    def __init__(self):
+    def __init__(self, report_data):
         super().__init__(timeout=None)
+        self.report_data = report_data
 
     @ui.button(label="ยืนยัน", style=discord.ButtonStyle.green, emoji="✅", custom_id="confirm_report")
     async def confirm(self, interaction: discord.Interaction, button: ui.Button):
@@ -48,9 +63,19 @@ class ConfirmView(ui.View):
             await interaction.response.send_message("คุณไม่มีสิทธิ์ยืนยันรายงานนี้", ephemeral=True)
             return
 
+        # เพิ่มข้อมูลลง Google Sheet
+        sheet = setup_google_sheets()
+        sheet.append_row([
+            self.report_data["id"],
+            self.report_data["reason"],
+            self.report_data["reporter"],
+            self.report_data["profile_url"],
+            "ยืนยันแล้ว"
+        ])
+
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         embed = discord.Embed(
-            description=f"ได้รับการอนุมัติโดย: {interaction.user.mention}\nID: **{interaction.message.embeds[0].fields[1].value}**",
+            description=f"ได้รับการอนุมัติโดย: {interaction.user.mention}\nID: **{self.report_data['id']}**",
             color=0x6287f5
         )
         await log_channel.send(embed=embed)
@@ -112,7 +137,13 @@ async def report(
     if img4: attachments.append(img4.url)
 
     # ส่งรายงานไปยังห้องที่กำหนด
-    view = ConfirmView()
+    report_data = {
+        "id": id,
+        "reason": reason,
+        "reporter": interaction.user.name,
+        "profile_url": profile.url
+    }
+    view = ConfirmView(report_data)
     await report_channel.send(
         content=f"<@&{NOTIFY_ROLE_ID}> มีรายงานใหม่!",  # แจ้งเตือนบทบาท
         embed=embed,
@@ -159,8 +190,4 @@ def run_bot():
     bot.run(TOKEN)
 
 if __name__ == "__main__":
-    # รัน Flask และบอท Discord พร้อมกัน
-    from threading import Thread
-    flask_thread = Thread(target=lambda: app.run(host="0.0.0.0", port=8080))
-    flask_thread.start()
     run_bot()
