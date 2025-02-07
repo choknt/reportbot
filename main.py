@@ -83,6 +83,7 @@ class ConfirmView(ui.View):
 @app_commands.choices(reason=[
     app_commands.Choice(name="สแปม/โฆษนา", value="สแปม/โฆษนา"),
     app_commands.Choice(name="การขายบัญชี", value="การขายบัญชี"),
+    app_commands.Choice(name="คำหยาบคาย", value="คำหยาบคาย"),
     app_commands.Choice(name="ชื่อที่ไม่เหมาะสม", value="ชื่อที่ไม่เหมาะสม"),
     app_commands.Choice(name="อนาจาร/18+", value="อนาจาร/18+"),
     app_commands.Choice(name="การเมือง", value="การเมือง"),
