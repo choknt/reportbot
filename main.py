@@ -35,7 +35,7 @@ async def on_ready():
         await bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching, 
-                name="/report เพื่อรายงานผู้เล่น"
+                name="happy birthday chok 🎂"
             )
         )
     except Exception as e:
