@@ -42,13 +42,16 @@ async def on_ready():
         await bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching, 
-                name="happy birthday chok 🎂"
+                name="/report เพื่อรายงาน"
             )
         )
     except Exception as e:
         print(f"Error syncing commands: {e}")
 
-class ConfirmView(ui.View):
+
+
+
+async def send_dm_notification(user: discord.User, caseclass ConfirmView(ui.View):
     def __init__(self, case_id: str):
         super().__init__(timeout=None)
         self.case_id = case_id
@@ -81,11 +84,16 @@ class ConfirmView(ui.View):
             )
             await log_channel.send(embed=embed)
 
-            # แจ้งผู้ใช้ที่รายงาน
-            original_embed = interaction.message.embeds[0]
-            reported_user_id = original_embed.fields[1].value.split("**")[1]  # ดึงไอดีผู้ใช้จาก embed
-            reported_user = await bot.fetch_user(reported_user_id)
-            await send_report_processed_notification(reported_user, self.case_id, interaction.user)
+            # แจ้งผู้ใช้ที่รายงาน (จัดการข้อผิดพลาดหากส่ง DM ไม่สำเร็จ)
+            try:
+                original_embed = interaction.message.embeds[0]
+                reported_user_id = original_embed.fields[1].value.split("**")[1]  # ดึงไอดีผู้ใช้จาก embed
+                reported_user = await bot.fetch_user(reported_user_id)
+                await send_report_processed_notification(reported_user, self.case_id, interaction.user)
+            except discord.Forbidden:
+                print(f"ไม่สามารถส่ง DM ไปยังผู้ใช้ {reported_user_id} ได้ เนื่องจากผู้ใช้ปิดการรับข้อความจากบอทหรือเซิร์ฟเวอร์")
+            except Exception as e:
+                print(f"เกิดข้อผิดพลาดในการส่ง DM: {e}")
 
             # ลบปุ่มออก
             self.clear_items()
@@ -95,10 +103,7 @@ class ConfirmView(ui.View):
             await interaction.followup.send("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
         except Exception as e:
             print(f"Error in ConfirmView: {e}")
-            await interaction.followup.send("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)
-
-
-async def send_dm_notification(user: discord.User, case_id: str, reported_id: str, reason: str):
+            await interaction.followup.send("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)_id: str, reported_id: str, reason: str):
     try:
         embed = discord.Embed(
             title="รายงานของคุณได้รับการสร้างขึ้นแล้ว",
