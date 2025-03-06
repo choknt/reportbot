@@ -4,6 +4,8 @@ from discord.ext import commands
 from discord import app_commands, ui
 from flask import Flask
 import threading
+import random
+import string
 
 # ตั้งค่า Flask
 app = Flask(__name__)
@@ -26,6 +28,11 @@ LOG_CHANNEL_ID = 1333392202939760690
 MOD_ROLE_ID = 1330887708100399135
 NOTIFY_ROLE_ID = 1330887708100399135
 
+# สร้างรหัสเคสแบบสุ่ม
+def generate_case_id():
+    random_part = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+    return f"{random.randint(1000000000000, 9999999999999)}-{random_part}"
+
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
@@ -42,8 +49,9 @@ async def on_ready():
         print(f"Error syncing commands: {e}")
 
 class ConfirmView(ui.View):
-    def __init__(self):
+    def __init__(self, case_id: str):
         super().__init__(timeout=None)
+        self.case_id = case_id
 
     @ui.button(label="ยืนยัน", style=discord.ButtonStyle.green, emoji="✅", custom_id="confirm_report")
     async def confirm(self, interaction: discord.Interaction, button: ui.Button):
@@ -61,14 +69,52 @@ class ConfirmView(ui.View):
             log_channel = await bot.fetch_channel(LOG_CHANNEL_ID)
 
         embed = discord.Embed(
-            description=f"ได้รับการอนุมัติโดย: {interaction.user.mention}\nID: **{interaction.message.embeds[0].fields[1].value}**",
+            description=f"ได้รับการอนุมัติโดย: {interaction.user.mention}\nID รายงาน: **{self.case_id}**",
             color=0x6287f5
         )
         await log_channel.send(embed=embed)
         await interaction.response.send_message("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
         
+        # ส่งข้อความแจ้งเตือนให้ผู้ใช้ที่รายงาน
+        original_embed = interaction.message.embeds[0]
+        reported_user = await bot.fetch_user(original_embed.fields[1].value.split("**")[1])
+        await send_report_processed_notification(reported_user, self.case_id, interaction.user)
+
         self.clear_items()
         await interaction.message.edit(view=self)
+
+async def send_dm_notification(user: discord.User, case_id: str, reported_id: str, reason: str):
+    try:
+        embed = discord.Embed(
+            title="รายงานของคุณได้รับการสร้างขึ้นแล้ว",
+            description=(
+                "ขอบคุณสำหรับการรายงานของคุณ จะมีผู้ดูแลระบบดูแลเรื่องนี้\n\n"
+                f"**รหัสรายงาน:**\n{case_id}\n\n"
+                f"**ผู้เล่นที่รายงาน:**\n{user.mention}\n\n"
+                f"**ไอดีผู้เล่นที่โดนรายงาน:**\n{reported_id}\n\n"
+                f"**เหตุผล:**\n{reason}\n\n"
+                "คุณจะได้รับแจ้งทันทีเมื่อรายงานของคุณได้รับการประมวลผลแล้ว"
+            ),
+            color=0x6287f5
+        )
+        await user.send(embed=embed)
+    except discord.Forbidden:
+        print(f"ไม่สามารถส่ง DM ไปยัง {user.name} ได้ เนื่องจากผู้ใช้ปิดการรับข้อความจากบอทหรือเซิร์ฟเวอร์")
+
+async def send_report_processed_notification(user: discord.User, case_id: str, moderator: discord.Member):
+    try:
+        embed = discord.Embed(
+            title=f"อัปเดตรายงานของคุณ #{case_id}",
+            description=(
+                "รายงานของคุณได้รับการจัดการแล้ว\n\n"
+                f"**อนุมัติโดย:**\n{moderator.mention}\n\n"
+                "ขอบคุณสำหรับการรายงาน"
+            ),
+            color=0x6287f5
+        )
+        await user.send(embed=embed)
+    except discord.Forbidden:
+        print(f"ไม่สามารถส่ง DM ไปยัง {user.name} ได้ เนื่องจากผู้ใช้ปิดการรับข้อความจากบอทหรือเซิร์ฟเวอร์")
 
 @bot.tree.command(name="report", description="รายงานผู้เล่น")
 @app_commands.describe(
@@ -104,19 +150,30 @@ async def report(
     if report_channel is None:
         report_channel = await bot.fetch_channel(REPORT_CHANNEL_ID)
 
-    embed = discord.Embed(title="รายงาน", color=0x6287f5)
+    # สร้างรหัสเคส
+    case_id = generate_case_id()
+
+    # สร้าง embed สำหรับห้องรายงาน
+    embed = discord.Embed(title="รายงานใหม่", color=0x6287f5)
     embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
+    embed.add_field(name="รหัสรายงาน", value=f"**{case_id}**", inline=False)
     embed.add_field(name="รายงานโดย", value=interaction.user.mention, inline=False)
-    embed.add_field(name="ไอดี", value=f"**{id}**", inline=False)
-    embed.add_field(name="สาเหตุ", value=f"**{reason}**", inline=False)
+    embed.add_field(name="ไอดีผู้เล่นที่โดนรายงาน", value=f"**{id}**", inline=False)
+    embed.add_field(name="เหตุผล", value=f"**{reason}**", inline=False)
     embed.set_image(url=profile.url)
 
-    attachments = [img.url for img in [img1, img2, img3, img4] if img]
-    view = ConfirmView()
-
+    # ส่ง embed ไปยังห้องรายงาน
+    view = ConfirmView(case_id)
     await report_channel.send(content=f"<@&{NOTIFY_ROLE_ID}> มีรายงานใหม่!", embed=embed, view=view)
-    if attachments:
-        await report_channel.send("\n".join(attachments))
+
+    # ส่งภาพหลักฐาน (ถ้ามี)
+    attachments = [img1, img2, img3, img4]
+    for img in attachments:
+        if img:
+            await report_channel.send(file=await img.to_file())
+
+    # ส่ง DM แจ้งเตือนผู้ใช้
+    await send_dm_notification(interaction.user, case_id, id, reason)
 
 @bot.tree.command(name="help", description="แสดงวิธีการรายงาน")
 async def help(interaction: discord.Interaction):
