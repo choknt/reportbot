@@ -67,6 +67,9 @@ class ConfirmView(ui.View):
                 await interaction.response.send_message("คุณไม่มีสิทธิ์ยืนยันรายงานนี้", ephemeral=True)
                 return
 
+            # ตอบกลับ interaction ก่อนแก้ไขข้อความ
+            await interaction.response.defer()
+
             # ส่งข้อความไปยังช่อง log
             log_channel = bot.get_channel(LOG_CHANNEL_ID)
             if log_channel is None:
@@ -88,11 +91,11 @@ class ConfirmView(ui.View):
             self.clear_items()
             await interaction.message.edit(view=self)
 
-            # ตอบกลับผู้กดปุ่ม
-            await interaction.response.send_message("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
+            # แจ้งผู้กดปุ่มว่ายืนยันเรียบร้อยแล้ว
+            await interaction.followup.send("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
         except Exception as e:
             print(f"Error in ConfirmView: {e}")
-            await interaction.response.send_message("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)
+            await interaction.followup.send("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)
 
 
 async def send_dm_notification(user: discord.User, case_id: str, reported_id: str, reason: str):
