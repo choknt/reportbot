@@ -42,16 +42,13 @@ async def on_ready():
         await bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching, 
-                name="/report เพื่อรายงาน"
+                name="happy birthday chok 🎂"
             )
         )
     except Exception as e:
         print(f"Error syncing commands: {e}")
 
-
-
-
-async def send_dm_notification(user: discord.User, caseclass ConfirmView(ui.View):
+class ConfirmView(ui.View):
     def __init__(self, case_id: str):
         super().__init__(timeout=None)
         self.case_id = case_id
@@ -103,7 +100,9 @@ async def send_dm_notification(user: discord.User, caseclass ConfirmView(ui.View
             await interaction.followup.send("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
         except Exception as e:
             print(f"Error in ConfirmView: {e}")
-            await interaction.followup.send("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)_id: str, reported_id: str, reason: str):
+            await interaction.followup.send("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)
+
+async def send_dm_notification(user: discord.User, case_id: str, reported_id: str, reason: str):
     try:
         embed = discord.Embed(
             title="รายงานของคุณได้รับการสร้างขึ้นแล้ว",
