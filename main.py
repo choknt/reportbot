@@ -55,33 +55,45 @@ class ConfirmView(ui.View):
 
     @ui.button(label="ยืนยัน", style=discord.ButtonStyle.green, emoji="✅", custom_id="confirm_report")
     async def confirm(self, interaction: discord.Interaction, button: ui.Button):
-        if interaction.guild is None:
-            await interaction.response.send_message("คำสั่งนี้ใช้ได้เฉพาะในเซิร์ฟเวอร์!", ephemeral=True)
-            return
+        try:
+            # ตรวจสอบว่า interaction อยู่ในเซิร์ฟเวอร์
+            if interaction.guild is None:
+                await interaction.response.send_message("คำสั่งนี้ใช้ได้เฉพาะในเซิร์ฟเวอร์!", ephemeral=True)
+                return
 
-        role = interaction.guild.get_role(MOD_ROLE_ID)
-        if role not in interaction.user.roles:
-            await interaction.response.send_message("คุณไม่มีสิทธิ์ยืนยันรายงานนี้", ephemeral=True)
-            return
+            # ตรวจสอบสิทธิ์ role
+            role = interaction.guild.get_role(MOD_ROLE_ID)
+            if role is None or role not in interaction.user.roles:
+                await interaction.response.send_message("คุณไม่มีสิทธิ์ยืนยันรายงานนี้", ephemeral=True)
+                return
 
-        log_channel = bot.get_channel(LOG_CHANNEL_ID)
-        if log_channel is None:
-            log_channel = await bot.fetch_channel(LOG_CHANNEL_ID)
+            # ส่งข้อความไปยังช่อง log
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel is None:
+                log_channel = await bot.fetch_channel(LOG_CHANNEL_ID)
 
-        embed = discord.Embed(
-            description=f"ได้รับการอนุมัติโดย: {interaction.user.mention}\nID รายงาน: **{self.case_id}**",
-            color=0x6287f5
-        )
-        await log_channel.send(embed=embed)
-        await interaction.response.send_message("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
-        
-        # ส่งข้อความแจ้งเตือนให้ผู้ใช้ที่รายงาน
-        original_embed = interaction.message.embeds[0]
-        reported_user = await bot.fetch_user(original_embed.fields[1].value.split("**")[1])
-        await send_report_processed_notification(reported_user, self.case_id, interaction.user)
+            embed = discord.Embed(
+                description=f"ได้รับการอนุมัติโดย: {interaction.user.mention}\nID รายงาน: **{self.case_id}**",
+                color=0x6287f5
+            )
+            await log_channel.send(embed=embed)
 
-        self.clear_items()
-        await interaction.message.edit(view=self)
+            # แจ้งผู้ใช้ที่รายงาน
+            original_embed = interaction.message.embeds[0]
+            reported_user_id = original_embed.fields[1].value.split("**")[1]  # ดึงไอดีผู้ใช้จาก embed
+            reported_user = await bot.fetch_user(reported_user_id)
+            await send_report_processed_notification(reported_user, self.case_id, interaction.user)
+
+            # ลบปุ่มออก
+            self.clear_items()
+            await interaction.message.edit(view=self)
+
+            # ตอบกลับผู้กดปุ่ม
+            await interaction.response.send_message("ยืนยันรายงานเรียบร้อยแล้ว", ephemeral=True)
+        except Exception as e:
+            print(f"Error in ConfirmView: {e}")
+            await interaction.response.send_message("เกิดข้อผิดพลาดในการยืนยันรายงาน", ephemeral=True)
+
 
 async def send_dm_notification(user: discord.User, case_id: str, reported_id: str, reason: str):
     try:
