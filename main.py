@@ -231,6 +231,41 @@ async def help(interaction: discord.Interaction):
         )
     await interaction.response.send_message(embed=embed, ephemeral=False)  # ให้ทุกคนเห็น
 
+@bot.tree.command(name="gce_staff", description="ตรวจสอบและให้สิทธิ์บทบาทในเซิร์ฟเวอร์อื่น")
+async def gce_staff(interaction: discord.Interaction):
+    user = interaction.user
+    guild_source = bot.get_guild(1219836401902813296)  # เซิร์ฟเวอร์ต้นทาง
+    guild_target = bot.get_guild(1329694920046280747)  # เซิร์ฟเวอร์เป้าหมาย
+
+    if not guild_source or not guild_target:
+        await interaction.response.send_message("ไม่สามารถเข้าถึงเซิร์ฟเวอร์ที่กำหนดได้", ephemeral=True)
+        return
+
+    member_source = guild_source.get_member(user.id)
+    member_target = guild_target.get_member(user.id)
+
+    if not member_source:
+        await interaction.response.send_message("คุณไม่ได้อยู่ในเซิร์ฟเวอร์ต้นทาง", ephemeral=True)
+        return
+
+    role_required = guild_source.get_role(1351916781572329544)
+    role_to_give = guild_target.get_role(1351918569562181673)
+
+    if not role_required or not role_to_give:
+        await interaction.response.send_message("ไม่พบบทบาทที่กำหนดในเซิร์ฟเวอร์", ephemeral=True)
+        return
+
+    if role_required not in member_source.roles:
+        await interaction.response.send_message("คุณไม่มีบทบาทที่จำเป็นในเซิร์ฟเวอร์ต้นทาง", ephemeral=True)
+        return
+
+    if not member_target:
+        await interaction.response.send_message("คุณไม่ได้อยู่ในเซิร์ฟเวอร์เป้าหมาย", ephemeral=True)
+        return
+
+    await member_target.add_roles(role_to_give)
+    await interaction.response.send_message("คุณได้รับบทบาทในเซิร์ฟเวอร์เป้าหมายเรียบร้อยแล้ว!", ephemeral=True)
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("กรุณาตั้งค่า Environment Variable: DISCORD_TOKEN")
