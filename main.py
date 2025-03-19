@@ -231,7 +231,7 @@ async def help(interaction: discord.Interaction):
         )
     await interaction.response.send_message(embed=embed, ephemeral=False)  # ให้ทุกคนเห็น
 
-@bot.tree.command(name="gce_staff", description="ตรวจสอบและให้สิทธิ์บทบาทในเซิร์ฟเวอร์อื่น")
+@bot.tree.command(name="gce_staff", description="สำหรับพนักงานของ galacticcore ")
 async def gce_staff(interaction: discord.Interaction):
     user = interaction.user
     guild_source = bot.get_guild(1219836401902813296)  # เซิร์ฟเวอร์ต้นทาง
@@ -256,15 +256,15 @@ async def gce_staff(interaction: discord.Interaction):
         return
 
     if role_required not in member_source.roles:
-        await interaction.response.send_message("คุณไม่มีบทบาทที่จำเป็นในเซิร์ฟเวอร์ต้นทาง", ephemeral=True)
+        await interaction.response.send_message("คุณไม่มีบทบาทที่จำเป็นในเซิร์ฟเวอร์", ephemeral=True)
         return
 
     if not member_target:
-        await interaction.response.send_message("คุณไม่ได้อยู่ในเซิร์ฟเวอร์เป้าหมาย", ephemeral=True)
+        await interaction.response.send_message("คุณไม่ได้เป็นพนักงานของเรา", ephemeral=True)
         return
 
     await member_target.add_roles(role_to_give)
-    await interaction.response.send_message("คุณได้รับบทบาทในเซิร์ฟเวอร์เป้าหมายเรียบร้อยแล้ว!", ephemeral=True)
+    await interaction.response.send_message("คุณได้รับบทบาทเรียบร้อยแล้ว!", ephemeral=True)
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
