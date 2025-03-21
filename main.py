@@ -305,7 +305,75 @@ async def rank(interaction: discord.Interaction):
         await interaction.response.send_message("เกิดข้อผิดพลาดในการดึงอันดับ", ephemeral=True)
 
 # คำสั่ง help และ gce_staff คงเดิมตามโค้ดต้นฉบับ
-# [เพิ่มโค้ด help และ gce_staff จากโค้ดเดิมที่นี่]
+
+@bot.tree.command(name="help", description="แสดงวิธีการรายงาน")  
+async def help(interaction: discord.Interaction):  
+   if interaction.user.id == 770227564442026024:  
+       embed = discord.Embed(  
+           title="สวัสดีค่ะคุณโชค",  
+           description=(  
+               "คุณต้องการแบนใครคะ ตอนนี้ sare security of chok พร้อมแล้ว\n"  
+               "และตอนนี้จะรับคำสั่งแค่คุณโชค ให้ตบหัวพ่อมันเลยไหม aura\n\n"  
+               "เพื่อ chok snow\n\n"  
+               "ไฮ โชค"  
+           ),  
+           color=0x6287f5  
+       )  
+   else:  
+       embed = discord.Embed(  
+           title="คู่มือการรายงาน",  
+           description="ใช้คำสั่ง `/report` เพื่อรายงานผู้เล่นที่ไม่ปฏิบัติตามกฎ\n",  
+           color=0x6287f5  
+       )  
+       embed.add_field(  
+           name="วิธีการใช้",  
+           value=(  
+               "1. พิมพ์ `/report` ในช่องแชท\n"  
+               "2. ระบุ ID ผู้เล่นที่ต้องการรายงาน\n"  
+               "3. เลือกเหตุผลการรายงาน\n"  
+               "4. แนบภาพหลักฐานตามที่กำหนด\n"  
+               "5. กดส่งรายงาน"  
+           ),  
+           inline=False  
+       )  
+       embed.add_field(  
+           name="📌 ข้อควรระวัง",  
+           value="กรุณาแนบหลักฐานให้ครบถ้วนและตรวจสอบข้อมูลให้ถูกต้อง",  
+           inline=False  
+       )  
+   await interaction.response.send_message(embed=embed, ephemeral=False)  # ให้ทุกคนเห็น  
+ 
+@bot.tree.command(name="gce_staff", description="สำหรับพนักงานของ galacticcore ")  
+async def gce_staff(interaction: discord.Interaction):  
+   user = interaction.user  
+   guild_source = bot.get_guild(1219836401902813296)  # เซิร์ฟเวอร์ต้นทาง  
+   guild_target = bot.get_guild(1329694920046280747)  # เซิร์ฟเวอร์เป้าหมาย  
+ 
+   if not guild_source or not guild_target:  
+       await interaction.response.send_message("ไม่สามารถเข้าถึงเซิร์ฟเวอร์ที่กำหนดได้", ephemeral=True)  
+       return  
+ 
+   member_source = guild_source.get_member(user.id)  
+   member_target = guild_target.get_member(user.id)  
+ 
+   if not member_source:  
+       await interaction.response.send_message("คุณไม่ได้อยู่ในเซิร์ฟเวอร์ต้นทาง", ephemeral=True)  
+       return  
+ 
+   role_required = guild_source.get_role(1351916781572329544)  
+   role_to_give = guild_target.get_role(1351918569562181673)  
+ 
+   if not role_required or not role_to_give:  
+       await interaction.response.send_message("ไม่พบบทบาทที่กำหนดในเซิร์ฟเวอร์", ephemeral=True)  
+       return  
+ 
+   if role_required not in member_source.roles:  
+       await interaction.response.send_message("คุณไม่มีบทบาทที่จำเป็นในเซิร์ฟเวอร์", ephemeral=True)  
+       return  
+ 
+   if not member_target:  
+       await interaction.response.send_message("คุณไม่ได้เป็นพนักงานของเรา", ephemeral=True)  
+       return
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
