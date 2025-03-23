@@ -32,10 +32,12 @@ LOG_CHANNEL_ID = 1333392202939760690
 MOD_ROLE_ID = 1330887708100399135
 NOTIFY_ROLE_ID = 1330887708100399135
 
-# Role ID สำหรับแรงค์
-NEW_REPORTER_ROLE = 67557444
-EXPERIENCED_REPORTER_ROLE = 87565453
-VETERAN_REPORTER_ROLE = 987765
+# Role ID สำหรับ 5 แรงค์ใหม่ (เว้นว่างให้คุณใส่เอง)
+RANK_1_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 1
+RANK_2_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 2
+RANK_3_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 3
+RANK_4_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 4
+RANK_5_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 5
 
 # เชื่อมต่อ MongoDB
 mongo_url = os.getenv("MONGO_URL")
@@ -44,12 +46,20 @@ try:
     client.server_info()  # ทดสอบการเชื่อมต่อ
     db = client["discord_bot"]
     ranks_collection = db["ranks"]
+    reports_collection = db["reports"]
     logging.info("Connected to MongoDB successfully")
 except Exception as e:
     logging.error(f"Failed to connect to MongoDB: {e}")
     raise
 
-# ฟังก์ชันจัดการแรงค์
+# ตั้งค่า TTL Index สำหรับ reports (4 เดือน = 120 วัน)
+try:
+    reports_collection.create_index("created_at", expireAfterSeconds=120 * 24 * 60 * 60)  # 10,368,000 วินาที
+    logging.info("TTL Index created for reports collection")
+except Exception as e:
+    logging.warning(f"TTL Index already exists or failed to create: {e}")
+
+# ฟังก์ชันจัดการแรงค์ (5 ระดับใหม่)
 def update_rank(user_id, guild):
     try:
         user_data = ranks_collection.find_one({"user_id": str(user_id)}) or {"reports": 0}
@@ -60,15 +70,19 @@ def update_rank(user_id, guild):
             upsert=True
         )
         if reports <= 5:
-            rank, role_id = "ผู้ใช้ใหม่ (New Reporter)", NEW_REPORTER_ROLE
-        elif 6 <= reports <= 20:
-            rank, role_id = "ผู้รายงานที่เชี่ยวชาญ (Experienced Reporter)", EXPERIENCED_REPORTER_ROLE
+            rank, role_id = "ผู้เริ่มต้น (Beginner Reporter)", RANK_1_ROLE
+        elif 6 <= reports <= 15:
+            rank, role_id = "ผู้รายงานมือใหม่ (Novice Reporter)", RANK_2_ROLE
+        elif 16 <= reports <= 30:
+            rank, role_id = "ผู้รายงานชำนาญ (Skilled Reporter)", RANK_3_ROLE
+        elif 31 <= reports <= 50:
+            rank, role_id = "ผู้รายงานอาวุโส (Senior Reporter)", RANK_4_ROLE
         else:
-            rank, role_id = "ผู้รายงานระดับสูง (Veteran Reporter)", VETERAN_REPORTER_ROLE
+            rank, role_id = "ผู้รายงานระดับตำนาน (Legendary Reporter)", RANK_5_ROLE
         return rank, role_id
     except Exception as e:
         logging.error(f"Error updating rank for user {user_id}: {e}")
-        return "ผู้ใช้ใหม่ (New Reporter)", NEW_REPORTER_ROLE
+        return "ผู้เริ่มต้น (Beginner Reporter)", RANK_1_ROLE
 
 def get_rank(user_id):
     try:
@@ -94,8 +108,8 @@ async def update_user_role(guild, user_id, new_role_id):
         logging.warning(f"Member {user_id} not found in guild")
         return
     
-    rank_roles = [NEW_REPORTER_ROLE, EXPERIENCED_REPORTER_ROLE, VETERAN_REPORTER_ROLE]
-    roles_to_remove = [role for role in rank_roles if role != new_role_id]
+    rank_roles = [RANK_1_ROLE, RANK_2_ROLE, RANK_3_ROLE, RANK_4_ROLE, RANK_5_ROLE]
+    roles_to_remove = [role for role in rank_roles if role != new_role_id and role is not None]
     
     try:
         for role_id in roles_to_remove:
@@ -156,6 +170,11 @@ class ConfirmView(ui.View):
             )
             await log_channel.send(embed=embed)
 
+            reports_collection.update_one(
+                {"case_id": self.case_id},
+                {"$set": {"approved_by": str(interaction.user.id), "approved_at": datetime.utcnow()}}
+            )
+
             try:
                 reported_user = await bot.fetch_user(self.reporter_id)
                 await send_report_processed_notification(reported_user, self.case_id, interaction.user)
@@ -188,6 +207,22 @@ async def send_dm_notification(user: discord.User, case_id: str, reported_id: st
         await user.send(embed=embed)
     except discord.Forbidden:
         logging.warning(f"Cannot send DM to {user.name}")
+
+async def save_report_to_db(case_id, reporter_id, reported_id, reason, profile_url, attachments):
+    try:
+        report_data = {
+            "case_id": case_id,
+            "reporter_id": str(reporter_id),
+            "reported_id": reported_id,
+            "reason": reason,
+            "profile_url": profile_url,
+            "attachments": [attachment.url for attachment in attachments if attachment],
+            "created_at": datetime.utcnow()
+        }
+        reports_collection.insert_one(report_data)
+        logging.info(f"Saved report {case_id} to database")
+    except Exception as e:
+        logging.error(f"Error saving report {case_id}: {e}")
 
 async def send_report_processed_notification(user: discord.User, case_id: str, moderator: discord.Member):
     try:
@@ -256,10 +291,110 @@ async def report(
             if img:
                 await report_channel.send(file=await img.to_file())
 
+        await save_report_to_db(case_id, interaction.user.id, id, reason, profile.url, attachments)
         await send_dm_notification(interaction.user, case_id, id, reason, rank)
     except Exception as e:
         logging.error(f"Error in report command: {e}")
         await interaction.followup.send("เกิดข้อผิดพลาดในการส่งรายงาน", ephemeral=True)
+
+class ReportHistoryModal(ui.Modal, title="ป้อนข้อมูลสำหรับประวัติรายงาน"):
+    search_value = ui.TextInput(label="ไอดีเคส หรือ ไอดีผู้ถูกรายงาน", placeholder="เช่น 123456789 หรือ 1234567890123-abcde12345")
+
+    def __init__(self, search_type: str):
+        super().__init__()
+        self.search_type = search_type
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=True)
+            query = {self.search_type: self.search_value.value}
+            reports = list(reports_collection.find(query))
+
+            if not reports:
+                await interaction.followup.send(f"ไม่พบประวัติการรายงานสำหรับ {self.search_type}: {self.search_value.value}", ephemeral=True)
+                return
+
+            embeds = []
+            for report in reports:
+                embed = discord.Embed(
+                    title=f"รายละเอียดรายงาน #{report['case_id']}",
+                    color=0x6287f5,
+                    timestamp=report["created_at"]
+                )
+                embed.add_field(name="ผู้รายงาน", value=f"<@{report['reporter_id']}> ({report['reporter_id']})", inline=False)
+                embed.add_field(name="ผู้ถูกรายงาน", value=report["reported_id"], inline=False)
+                embed.add_field(name="เหตุผล", value=report["reason"], inline=False)
+                embed.add_field(name="รูปโปรไฟล์", value=report["profile_url"], inline=False)
+                embed.add_field(name="รูปแนบ", value="\n".join(report["attachments"]) or "ไม่มี", inline=False)
+                approved_by = report.get("approved_by", "ยังไม่ได้รับการอนุมัติ")
+                embed.add_field(name="อนุมัติโดย", value=f"<@{approved_by}> ({approved_by})" if approved_by != "ยังไม่ได้รับการอนุมัติ" else approved_by, inline=False)
+                embeds.append(embed)
+
+            for i in range(0, len(embeds), 10):
+                await interaction.followup.send(embeds=embeds[i:i+10], ephemeral=True)
+        except Exception as e:
+            logging.error(f"Error in ReportHistoryModal: {e}")
+            await interaction.followup.send("เกิดข้อผิดพลาดในการดึงประวัติ", ephemeral=True)
+
+class ReportHistoryView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+
+    @ui.select(
+        placeholder="เลือกประเภทการค้นหา",
+        options=[
+            discord.SelectOption(label="ไอดีเคส", value="case_id"),
+            discord.SelectOption(label="ไอดีผู้ถูกรายงาน", value="reported_id")
+        ]
+    )
+    async def select_callback(self, interaction: discord.Interaction, select: ui.Select):
+        await interaction.response.send_modal(ReportHistoryModal(search_type=select.values[0]))
+
+@bot.tree.command(name="report_history", description="ดูประวัติการรายงาน (เลือกไอดีเคสหรือไอดีผู้ถูกรายงาน)")
+@app_commands.checks.has_role(MOD_ROLE_ID)  # เฉพาะม็อดใช้ได้
+async def report_history(interaction: discord.Interaction):
+    try:
+        await interaction.response.send_message("เลือกประเภทการค้นหา:", view=ReportHistoryView(), ephemeral=True)
+    except Exception as e:
+        logging.error(f"Error in report_history command: {e}")
+        await interaction.followup.send("เกิดข้อผิดพลาดในการเริ่มคำสั่ง", ephemeral=True)
+
+@bot.tree.command(name="report_all", description="ดูรายการเคสทั้งหมด")
+@app_commands.checks.has_role(MOD_ROLE_ID)  # เฉพาะม็อดใช้ได้
+async def report_all(interaction: discord.Interaction):
+    try:
+        await interaction.response.defer(ephemeral=True)
+        
+        reports = list(reports_collection.find({}, {"case_id": 1, "reported_id": 1, "_id": 0}))
+        if not reports:
+            await interaction.followup.send("ยังไม่มีรายงานในระบบ", ephemeral=True)
+            return
+
+        embeds = []
+        current_embed = discord.Embed(title="รายการเคสทั้งหมด", color=0x6287f5, timestamp=datetime.utcnow())
+        field_count = 0
+
+        for report in reports:
+            if field_count >= 25:
+                embeds.append(current_embed)
+                current_embed = discord.Embed(title="รายการเคสทั้งหมด (ต่อ)", color=0x6287f5, timestamp=datetime.utcnow())
+                field_count = 0
+            
+            current_embed.add_field(
+                name=f"เคส: {report['case_id']}",
+                value=f"ผู้ถูกรายงาน: {report['reported_id']}",
+                inline=False
+            )
+            field_count += 1
+
+        if field_count > 0:
+            embeds.append(current_embed)
+
+        for i in range(0, len(embeds), 10):
+            await interaction.followup.send(embeds=embeds[i:i+10], ephemeral=True)
+    except Exception as e:
+        logging.error(f"Error in report_all command: {e}")
+        await interaction.followup.send("เกิดข้อผิดพลาดในการดึงรายการเคส", ephemeral=True)
 
 @bot.tree.command(name="rank", description="ดูอันดับการรายงาน")
 async def rank(interaction: discord.Interaction):
@@ -287,11 +422,15 @@ async def rank(interaction: discord.Interaction):
             
             reports = data["reports"]
             if reports <= 5:
-                rank = "ผู้ใช้ใหม่"
-            elif 6 <= reports <= 20:
-                rank = "ผู้รายงานที่เชี่ยวชาญ"
+                rank = "ผู้เริ่มต้น"
+            elif 6 <= reports <= 15:
+                rank = "ผู้รายงานมือใหม่"
+            elif 16 <= reports <= 30:
+                rank = "ผู้รายงานชำนาญ"
+            elif 31 <= reports <= 50:
+                rank = "ผู้รายงานอาวุโส"
             else:
-                rank = "ผู้รายงานระดับสูง"
+                rank = "ผู้รายงานระดับตำนาน"
 
             embed.add_field(
                 name=f"#{i} - {user_display}",
@@ -303,8 +442,6 @@ async def rank(interaction: discord.Interaction):
     except Exception as e:
         logging.error(f"Error in rank command: {e}")
         await interaction.response.send_message("เกิดข้อผิดพลาดในการดึงอันดับ", ephemeral=True)
-
-# คำสั่ง help และ gce_staff คงเดิมตามโค้ดต้นฉบับ
 
 @bot.tree.command(name="help", description="แสดงวิธีการรายงาน")  
 async def help(interaction: discord.Interaction):  
