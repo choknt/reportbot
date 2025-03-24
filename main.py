@@ -33,11 +33,11 @@ MOD_ROLE_ID = 1330887708100399135
 NOTIFY_ROLE_ID = 1330887708100399135
 
 # Role ID สำหรับ 5 แรงค์ใหม่ (เว้นว่างให้คุณใส่เอง)
-RANK_1_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 1
-RANK_2_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 2
-RANK_3_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 3
-RANK_4_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 4
-RANK_5_ROLE = None  # ใส่ Role ID สำหรับแรงค์ 5
+RANK_1_ROLE = 1353715536231399464  # ใส่ Role ID สำหรับแรงค์ 1
+RANK_2_ROLE = 1353716515144204373  # ใส่ Role ID สำหรับแรงค์ 2
+RANK_3_ROLE = 1353716719356481557  # ใส่ Role ID สำหรับแรงค์ 3
+RANK_4_ROLE = 1353717794101006376  # ใส่ Role ID สำหรับแรงค์ 4
+RANK_5_ROLE = 1353717989345726545  # ใส่ Role ID สำหรับแรงค์ 5
 
 # เชื่อมต่อ MongoDB
 mongo_url = os.getenv("MONGO_URL")
